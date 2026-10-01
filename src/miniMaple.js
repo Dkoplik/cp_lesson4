@@ -370,17 +370,27 @@ class BinOp {
     }
 
     if (op === "*") {
-      if (lNum && rNum) return new Num(l.value * r.value);
-      if ((lNum && l.value === 0) || (rNum && r.value === 0)) return new Num(0);
-      if (lNum && l.value === 1) return r;
-      if (rNum && r.value === 1) return l;
-
       const flat = BinOp._flattenMul(l, r);
 
       if (flat.coef === 0) return new Num(0);
-      if (flat.rest.length === 0) return new Num(flat.coef);
 
-      const restExpr = flat.rest.reduce(
+      // Rebuild the symbolic part from the merged power map.
+      const factors = [];
+      for (const { base, exp } of flat.powers.values()) {
+        if (exp === 0) continue; // base^0 → drop
+        if (exp === 1) {
+          factors.push(base);
+        } else {
+          factors.push(new BinOp("^", base, new Num(exp)));
+        }
+      }
+
+      // No symbolic factors left → the whole product is just the coefficient.
+      if (factors.length === 0) {
+        return new Num(flat.coef);
+      }
+
+      const restExpr = factors.reduce(
         (acc, cur) => (acc === null ? cur : new BinOp("*", acc, cur)),
         null,
       );
@@ -457,20 +467,70 @@ class BinOp {
     collect(right, nodes);
 
     let coef = 1;
-    const rest = [];
+    const powers = new Map(); // key: base.toString(), value: { base, exp }
 
     for (const n of nodes) {
       if (n instanceof Num) {
         coef *= n.value;
-      } else if (n instanceof Neg) {
+        continue;
+      }
+      if (n instanceof Neg) {
         coef *= -1;
-        rest.push(n.inner);
+        // Re-process the inner node as a factor.
+        const inner = n.inner;
+        if (inner instanceof Num) {
+          coef *= inner.value;
+        } else {
+          const { base, exp, opaque } = BinOp._baseExp(inner);
+          if (base === null) continue;
+          if (opaque) {
+            // Cannot safely merge — push as its own entry keyed uniquely.
+            powers.set(Symbol(), { base, exp });
+          } else {
+            const key = base.toString();
+            if (powers.has(key)) {
+              powers.get(key).exp += exp;
+            } else {
+              powers.set(key, { base, exp });
+            }
+          }
+        }
+        continue;
+      }
+
+      const { base, exp, opaque } = BinOp._baseExp(n);
+      if (base === null) continue;
+      if (opaque) {
+        powers.set(Symbol(), { base, exp });
       } else {
-        rest.push(n);
+        const key = base.toString();
+        if (powers.has(key)) {
+          powers.get(key).exp += exp;
+        } else {
+          powers.set(key, { base, exp });
+        }
       }
     }
 
-    return { coef, rest };
+    return { coef, powers };
+  }
+
+  static _baseExp(node) {
+    if (node instanceof BinOp && node.op === "^") {
+      const exp = node.right.simplify();
+      if (exp instanceof Num && exp.value === 1) {
+        return { base: node.left, exp: 1 };
+      }
+      if (exp instanceof Num && exp.value === 0) {
+        return { base: null, exp: 0 };
+      }
+      if (exp instanceof Num) {
+        return { base: node.left, exp: exp.value };
+      }
+      // Non-numeric exponent — treat as an opaque atom (no merging).
+      return { base: node, exp: 1, opaque: true };
+    }
+    return { base: node, exp: 1 };
   }
 }
 

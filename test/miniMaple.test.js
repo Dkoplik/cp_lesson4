@@ -74,12 +74,72 @@ describe("MiniMaple.diff", () => {
     expect(m.diff("x^2*x^3", "x")).toBe("5*x^4");
   });
 
+  test("product rule: x*x^5 -> 6*x^5", () => {
+    expect(m.diff("x*x^5", "x")).toBe("6*x^5");
+  });
+
   test("sum of two terms", () => {
     expect(m.diff("x^2+x", "x")).toBe("2*x+1");
   });
 
+  test("sum of two identical terms", () => {
+    expect(m.diff("x^2+x^2", "x")).toBe("4*x");
+  });
+
+  test("sum of tree terms", () => {
+    expect(m.diff("x+x+x", "x")).toBe("3");
+  });
+
+  test("double negative", () => {
+    expect(m.diff("--x", "x")).toBe("1");
+  });
+
+  test("substract negative", () => {
+    expect(m.diff("-x -x", "x")).toBe("-2");
+  });
+
+  test("substract same", () => {
+    expect(m.diff("x -x", "x")).toBe("0");
+  });
+
+  test("-x + x -(2*x^5)^2 -> -40*x^9", () => {
+    expect(m.diff("-x + x -(2*x^5)^2", "x")).toBe("-40*x^9");
+  });
+
+  test("x^3 + x^2", () => {
+    expect(m.diff("x^3 + x^2", "x")).toBe("3*x^2+2*x");
+  });
+
+  test("(-x)*y", () => {
+    expect(m.diff("(-x)*y", "x")).toBe("-y");
+  });
+
+  test("(-2)*(-x)", () => {
+    expect(m.diff("(-2)*(-x)", "x")).toBe("2");
+  });
+
   test("x^2*y -> 2*x*y", () => {
     expect(m.diff("x^2*y", "x")).toBe("2*x*y");
+  });
+
+  test("(x)", () => {
+    expect(m.diff("(x)", "x")).toBe("1");
+  });
+
+  test("(2*x)", () => {
+    expect(m.diff("(2*x)", "x")).toBe("2");
+  });
+
+  test("(x)^2", () => {
+    expect(m.diff("(x)^2", "x")).toBe("2*x");
+  });
+
+  test("(2*x)^2", () => {
+    expect(m.diff("(2*x)^2", "x")).toBe("8*x");
+  });
+
+  test("(2*x)^2 + x^2", () => {
+    expect(m.diff("(2*x)^2 + x^2", "x")).toBe("10*x");
   });
 
   test("unsupported operator /", () => {
@@ -116,5 +176,13 @@ describe("MiniMaple.diff", () => {
 
   test("invalid expression", () => {
     expect(() => m.diff("+", "x")).toThrow();
+  });
+
+  test("invalid expression", () => {
+    expect(() => m.diff("x^y", "x")).toThrow();
+  });
+
+  test("invalid expression", () => {
+    expect(() => m.diff("(x + 2", "x")).toThrow();
   });
 });
